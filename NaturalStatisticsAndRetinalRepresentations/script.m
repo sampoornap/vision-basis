@@ -6,15 +6,11 @@
 % L5: local contrast distribution (phase scrambled)
 % L6: bivariate luminance-contrast distribution (phase scrambled)
 
-% Begin with clean slate
-clear; close all; clc;
 
-%% Paths
 thisPath   = pwd;
 natImPath  = fullfile(thisPath, 'NatImages');
 windowPath = fullfile(thisPath, 'Window');
 
-%% Load window (Flattop8.tif)
 cd(windowPath);
 
 [winIdx, map] = imread('Flattop8.tif');
@@ -28,7 +24,7 @@ end
 window = im2double(window);
 window = window(:,:,1);          
 
-% Normalize window weights
+% normalize window weights
 w = window;
 w = w / sum(w(:));
 
@@ -39,7 +35,7 @@ highR = winsize(1) - lowR - 1;
 
 lowC  = floor((winsize(2)-1)/2);
 highC = winsize(2) - lowC - 1;
-%% Load natural images
+
 cd(natImPath);
 
 imNames = { ...
@@ -49,51 +45,51 @@ imNames = { ...
 images = cell(numel(imNames),1);
 for k = 1:numel(imNames)
     I = im2double(imread(imNames{k}));
-    if size(I,3) > 1, I = rgb2gray(I); end % use grayscale luminance
+    if size(I,3) > 1, I = rgb2gray(I); end % using grayscale luminance
     images{k} = I;
 end
 
 cd(thisPath);
 
-%% Parameters for sampling
-numPatchesPerImage = 5000;  % increase for smoother distributions
-useRelativeContrast = false; % true => std/mean, false => std only
 
-% Storage (natural)
+numPatchesPerImage = 5000;  
+useRelativeContrast = false; 
+
+% storage (natural)
 L_nat = zeros(numel(images)*numPatchesPerImage,1);
 C_nat = zeros(numel(images)*numPatchesPerImage,1);
 
-% Storage (phase scrambled)
+% storage (phase scrambled)
 L_ps  = zeros(numel(images)*numPatchesPerImage,1);
 C_ps  = zeros(numel(images)*numPatchesPerImage,1);
 
-%% Helper: phase scramble (keeps amplitude spectrum, randomizes phase)
+%% (keeps amplitude spectrum, randomizes phase)
 phaseScramble = @(I) localPhaseScramble(I);
 
-%% Main loop: sample patches and compute local luminance/contrast
+%% sample patches and compute local luminance/contrast
 idx = 1;
 for k = 1:numel(images)
     I = images{k};
     [imrows, imcols] = size(I);
 
-    % Phase-scrambled version 
+    % phase scrambled version 
     IPS = phaseScramble(I);
 
-    % Valid centers (avoid borders)
+    % (avoid borders)
     rmin = 1 + lowR;
     rmax = imrows - highR;
     cmin = 1 + lowC;
     cmax = imcols - highC;
 
     for n = 1:numPatchesPerImage
-        % Pick a random top-left corner so the patch is exactly the window size
+        % picking a random top-left corner so the patch is exactly the window size
         r0 = randi([1, imrows - winsize(1) + 1]);
         c0 = randi([1, imcols - winsize(2) + 1]);
         
         patchNat = I(  r0:r0+winsize(1)-1,  c0:c0+winsize(2)-1 );
         patchPS  = IPS(r0:r0+winsize(1)-1,  c0:c0+winsize(2)-1 );
 
-        % Windowed / weighted stats
+        % windowed / weighted stats
         [Ln, Cn] = weightedLumContrast(patchNat, w, useRelativeContrast);
         [Lp, Cp] = weightedLumContrast(patchPS,  w, useRelativeContrast);
 
@@ -104,7 +100,7 @@ for k = 1:numel(images)
     end
 end
 
-%%L1/L2/L3: Natural distributions 
+%%L1/L2/L3
 figure('Name','Natural image patch statistics'); clf;
 
 subplot(2,3,1);
@@ -121,7 +117,7 @@ subplot(2,3,3);
 plotBivariate(L_nat, C_nat);
 title('L3: Natural bivariate (L,C)');
 
-%%L4/L5/L6: Phase-scrambled distributions 
+%%L4/L5/L6
 subplot(2,3,4);
 histogram(L_ps, 60, 'Normalization','pdf');
 xlabel('Local luminance (weighted mean)'); ylabel('PDF');
@@ -141,10 +137,10 @@ outPath = fullfile(thisPath, 'patch_stats.mat');
 save(outPath, 'L_nat','C_nat','L_ps','C_ps','winsize','numPatchesPerImage','useRelativeContrast');
 disp(['Saved stats to: ' outPath]);
 
-%% helpers
+
 function [L, C] = weightedLumContrast(patch, w, useRelativeContrast)
 
-    % Force patch to 2D grayscale 
+    % patch to 2D grayscale 
     if ndims(patch) == 3
         if size(patch,3) >= 3
             patch = 0.2989*patch(:,:,1) + 0.5870*patch(:,:,2) + 0.1140*patch(:,:,3);
@@ -153,13 +149,13 @@ function [L, C] = weightedLumContrast(patch, w, useRelativeContrast)
         end
     end
 
-    % Safety, w must match patch
+    % w must match patch
     assert(isequal(size(patch), size(w)), 'Patch and window size mismatch.');
 
-    % Weighted mean luminance (scalar)
+    % weighted mean luminance 
     L = sum(patch(:) .* w(:));
 
-    % Weighted variance (scalar): E[x^2] - (E[x])^2
+    % weighted variance E[x^2] - (E[x])^2
     Ex2  = sum((patch(:).^2) .* w(:));
     varW = max(Ex2 - L.^2, 0);
     stdW = sqrt(varW);
@@ -172,14 +168,14 @@ function [L, C] = weightedLumContrast(patch, w, useRelativeContrast)
 end
 
 function Iout = localPhaseScramble(Iin)
-    % Phase-scramble a real image while preserving amplitude spectrum.
-    % Returns an image rescaled to [0,1] 
+    % phase-scramble a real image while preserving amplitude spectrum
+    
     I = double(Iin);
 
     F = fft2(I);
     A = abs(F);
 
-    % Random phase (keep DC phase = original to preserve mean better)
+    % (keep DC phase = original to preserve mean better)
     phi = angle(F);
     randPhi = (2*pi) * rand(size(I)) - pi;
     randPhi(1,1) = phi(1,1);
@@ -187,7 +183,7 @@ function Iout = localPhaseScramble(Iin)
     Fscr = A .* exp(1i * randPhi);
     Iscr = real(ifft2(Fscr));
 
-    % Normalize to [0,1] (so patch stats comparable scale-wise)
+    % mormalizing to [0,1] (so patch stats comparable scale-wise)
     Iscr = Iscr - min(Iscr(:));
     Iscr = Iscr / max(Iscr(:) + eps);
 
