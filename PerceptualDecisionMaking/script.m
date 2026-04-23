@@ -1,245 +1,194 @@
-% L1: Get the posterior for a Gaussian prior and likelihood with same spread but different means
-% L2: Vary the spread of the likelihood, compute the mode of the posterior
-% L3: Vary the spread of the prior, compute the mode of the posterior
-% L4: For all these cases, compute the spread of the posterior, compare with the likelihood spread
-% L5: Simulate a maximum-likelihood cue-integration strategy for a 2AFC discrimination task
-% L6: Compute the resulting within-modality and cross-modal psychometric functions
+% L1: Simulate a 2AFC bounded accumulation decision-making process for an ambiguous stimulus
+% L2: Add several conditions with varying stimulus strength, compute the psychometric function
+% L3: Compute the chronometric function
+% L4: Simulate the speed-accuracy trade-off commonly seen in human decision-making
+% L5: Derive the expected temporal evolution of the variance of the decision-variable, verify
+% L6: Derive the expected autocorrelation function of the decision-variable, verify
 
 
-mu_prior = 2;
-mu_like  = 6;
-sigma = 2;
+%L1 - ambiguous so mean ~= 0
 
-% x-axis for plotting
-x = linspace(-2, 10, 1000);
+dt = 0.001;
+T = 2; % max time
+time = 0:dt:T;
 
-% Prior and likelihood
-prior = normpdf(x, mu_prior, sigma);
-like  = normpdf(x, mu_like, sigma);
+mu = 0; % ambiguous
+sigma = 1;
+B = 1; % bound
 
-% posterior parameters
-mu_post = (mu_prior + mu_like) / 2;
-sigma_post = sigma / sqrt(2); % weighing by reciprocal of variance 
+x = 0;
+traj = zeros(size(time));
 
-% posterior curve
-post = normpdf(x, mu_post, sigma_post);
+for t = 1:length(time)
+    dx = mu*dt + sigma*sqrt(dt)*randn;
+    x = x + dx;
+    traj(t) = x;
 
-
-figure;
-plot(x, prior, 'LineWidth', 2); hold on;
-plot(x, like, 'LineWidth', 2);
-plot(x, post, 'LineWidth', 2);
-
-legend('Prior', 'Likelihood', 'Posterior');
-xlabel('x');
-ylabel('Density');
-title('Posterior for Gaussian Prior and Likelihood w Same Spread');
-grid on;
-
-
-% L2 
-
-% new prior
-mu_prior = 2;
-sigma_prior = 2;
-
-% new mean
-mu_like = 8;
-
-% different likelihood spreads
-sigma_like_vals = [1 2 3 5 8];
-
-% for storing posterior modes
-post_modes = zeros(size(sigma_like_vals));
-posterior_spreads_L2 = zeros(size(sigma_like_vals));
-
-for i = 1:length(sigma_like_vals)
-    sigma_like = sigma_like_vals(i);
-
-    % posterior variance
-    sigma_post_sq = 1 / (1/sigma_prior^2 + 1/sigma_like^2);
-    posterior_spreads_L2(i) = sigma_post_sq;
-
-    % posterior mean 
-    mu_post = sigma_post_sq * (mu_prior/sigma_prior^2 + mu_like/sigma_like^2);
-
-    post_modes(i) = mu_post;
+    if x >= B
+        decision = 1;
+        RT = time(t);
+        break;
+    elseif x <= -B
+        decision = -1;
+        RT = time(t);
+        break;
+    end
 end
 
-% res
-disp(table(sigma_like_vals', post_modes', 'VariableNames', {'likelihoodSpread', 'posteriorMode'}));
+plot(time, traj); hold on;
+yline(B); yline(-B);
+title('Single trial accumulation');
 
+% L2
 
-figure;
-plot(sigma_like_vals, post_modes, '-o', 'LineWidth', 2);
-xlabel('likelihood spread');
-ylabel('posterior mode');
-title('Effects of likelihood spread on posterior mode');
-grid on;
+mus = [-0.2 -0.1 0 0.1 0.2];
+nTrials = 200;
 
-% res L4
+accuracy = zeros(size(mus));
 
-disp(table(sigma_like_vals', posterior_spreads_L2', 'VariableNames', {'likelihoodSpread', 'posteriorSpread'}));
+for i = 1:length(mus)
+    correct = 0;
 
+    for trial = 1:nTrials
+        x = 0;
 
-figure;
-plot(sigma_like_vals, posterior_spreads_L2, '-o', 'LineWidth', 2);
-xlabel('likelihood spread');
-ylabel('posterior spread');
-title('Effects of likelihood spread on posterior spread L2');
-grid on;
+        for t = 1:length(time)
+            dx = mus(i)*dt + sigma*sqrt(dt)*randn;
+            x = x + dx;
 
-
-
-% L3 
-
-% new likelihood
-mu_like = 8;
-sigma_like = 2;
-
-% new prior
-mu_prior = 2;
-sigma_prior_vals = [1 2 3 5 8];
-
-% for storing posterior modes
-post_modes = zeros(size(sigma_prior_vals));
-posterior_spreads_L3 = zeros(size(sigma_prior_vals));
-likelihood_spreads = zeros(size(sigma_prior_vals));
-
-for i = 1:length(sigma_prior_vals)
-    sigma_prior = sigma_prior_vals(i);
-
-    % posterior variance
-    sigma_post_sq = 1 / (1/sigma_prior^2 + 1/sigma_like^2);
-    posterior_spreads_L3(i) = sigma_post_sq;
-    likelihood_spreads(i) = sigma_like;
-
-    % posterior mean 
-    mu_post = sigma_post_sq * (mu_prior/sigma_prior^2 + mu_like/sigma_like^2);
-
-    post_modes(i) = mu_post;
-end
-
-% res
-disp(table(sigma_prior_vals', post_modes', 'VariableNames', {'priorSpread', 'posteriorMode'}));
-
-
-figure;
-plot(sigma_like_vals, post_modes, '-o', 'LineWidth', 2);
-xlabel('prior spread');
-ylabel('posterior mode');
-title('Effects of prior spread on posterior mode');
-grid on;
-
-% res L4
-
-disp(table(likelihood_spreads', posterior_spreads_L3', 'VariableNames', {'likelihoodSpread', 'posteriorSpread'}));
-
-
-figure;
-plot(likelihood_spreads, posterior_spreads_L3, '-o', 'LineWidth', 2);
-xlabel('likelihood spread');
-ylabel('posterior spread');
-title('Effects of likelihood spread on posterior spread L3');
-grid on;
-
-
-% L4 - For all these cases, compute the spread of the posterior, compare with the likelihood spread
-
-% done 
-
-% L5: Simulate a maximum-likelihood cue-integration strategy for a 2AFC discrimination task
-
-standard = 0;
-comparisons = -5:1:5;
-
-% noise
-sigma1 = 2;   
-sigma2 = 1;   % less noisy (like vision)
-
-% MLE weights
-w1 = (1/sigma1^2) / (1/sigma1^2 + 1/sigma2^2);
-w2 = (1/sigma2^2) / (1/sigma1^2 + 1/sigma2^2);
-
-nTrials = 1000;
-p_choose_comparison = zeros(size(comparisons)); % to store frac of times comparison is taller
-for i = 1:length(comparisons) % 11
-    comp = comparisons(i);
-    chooseComp = 0;
-
-    for t = 1:nTrials
-        % noisy cue measurements for standard
-        x1_s = standard + sigma1*randn;
-        x2_s = standard + sigma2*randn;
-
-        % noisy cue measurements for comparison
-        x1_c = comp + sigma1*randn;
-        x2_c = comp + sigma2*randn;
-
-        % MLE combined estimates
-        s_hat = w1*x1_s + w2*x2_s;
-        c_hat = w1*x1_c + w2*x2_c;
-
-        % 2AFC final decision
-        if c_hat > s_hat
-            chooseComp = chooseComp + 1;
+            if x >= B
+                if mus(i) > 0, correct = correct + 1; end
+                break;
+            elseif x <= -B
+                if mus(i) < 0, correct = correct + 1; end
+                break;
+            end
         end
     end
 
-    p_choose_comparison(i) = chooseComp / nTrials;
+    accuracy(i) = correct / nTrials;
 end
 
-figure;
-plot(comparisons, p_choose_comparison, '-o', 'LineWidth', 2);
-xlabel('comparison stimulus height');
-ylabel('Pr(comparison is taller)');
-title('2AFC with MLE cues integration');
-grid on;
+plot(mus, accuracy, 'o-');
+xlabel('Stimulus strength'); ylabel('P(correct)');
+title('Psychometric function');
 
-% L6: Compute the resulting within-modality and cross-modal psychometric functions
 
-standard = 0;
-comparisons = -5:1:5;
+% L3
 
-% noise
-sigma1 = 2;   
-sigma2 = 1;   % less noisy (like vision)
+RTs = zeros(size(mus));
 
-% MLE weights
-w1 = (1/sigma1^2) / (1/sigma1^2 + 1/sigma2^2);
-w2 = (1/sigma2^2) / (1/sigma1^2 + 1/sigma2^2);
+for i = 1:length(mus)
+    rt_list = [];
 
-nTrials = 1000;
-p_choose_comparison = zeros(size(comparisons)); % to store frac of times comparison is taller
-for i = 1:length(comparisons) % 11
-    comp = comparisons(i);
-    chooseComp = 0;
+    for trial = 1:nTrials
+        x = 0;
 
-    for t = 1:nTrials
-        % noisy cue measurements for standard
-        x1_s = standard + sigma1*randn;
-        % x2_s = standard + sigma2*randn;
+        for t = 1:length(time)
+            dx = mus(i)*dt + sigma*sqrt(dt)*randn;
+            x = x + dx;
 
-        % noisy cue measurements for comparison
-        x1_c = comp + sigma1*randn;
-        % x2_c = comp + sigma2*randn;
-
-        % MLE combined estimates
-        s_hat = x1_s;
-        c_hat = x1_c;
-
-        % 2AFC final decision
-        if c_hat > s_hat
-            chooseComp = chooseComp + 1;
+            if abs(x) >= B
+                rt_list(end+1) = time(t);
+                break;
+            end
         end
     end
 
-    p_choose_comparison(i) = chooseComp / nTrials;
+    RTs(i) = mean(rt_list);
 end
 
-figure;
-plot(comparisons, p_choose_comparison, '-o', 'LineWidth', 2);
-xlabel('comparison stimulus height');
-ylabel('Pr(comparison is taller)');
-title('2AFC with within modality MLE cues integration');
-grid on;
+plot(mus, RTs, 'o-');
+xlabel('Stimulus strength'); ylabel('Reaction time');
+title('Chronometric function');
+
+% L4
+
+Bs = [0.5 1 1.5];
+
+for b = 1:length(Bs)
+    B = Bs(b);
+
+    accuracy = zeros(size(mus));
+
+    for i = 1:length(mus)
+        correct = 0;
+    
+        for trial = 1:nTrials
+            x = 0;
+    
+            for t = 1:length(time)
+                dx = mus(i)*dt + sigma*sqrt(dt)*randn;
+                x = x + dx;
+    
+                if x >= B
+                    if mus(i) > 0, correct = correct + 1; end
+                    break;
+                elseif x <= -B
+                    if mus(i) < 0, correct = correct + 1; end
+                    break;
+                end
+            end
+        end
+    
+        accuracy(i) = correct / nTrials;
+    end
+    RTs = zeros(size(mus));
+
+    for i = 1:length(mus)
+        rt_list = [];
+    
+        for trial = 1:nTrials
+            x = 0;
+    
+            for t = 1:length(time)
+                dx = mus(i)*dt + sigma*sqrt(dt)*randn;
+                x = x + dx;
+    
+                if abs(x) >= B
+                    rt_list(end+1) = time(t);
+                    break;
+                end
+            end
+        end
+    
+        RTs(i) = mean(rt_list);
+    end
+    % store results
+end
+
+
+% L5
+nTrials = 500;
+traj_all = zeros(nTrials, length(time));
+
+for trial = 1:nTrials
+    x = 0;
+
+    for t = 1:length(time)
+        dx = sigma*sqrt(dt)*randn;
+        x = x + dx;
+        traj_all(trial,t) = x;
+    end
+end
+
+var_t = var(traj_all);
+
+plot(time, var_t); hold on;
+plot(time, sigma^2*time, '--');
+legend('Simulated','Theory');
+title('Variance over time');
+
+
+
+% L6
+
+t1 = 200; 
+t2 = 400;
+
+x1 = traj_all(:, t1);
+x2 = traj_all(:, t2);
+
+cov_empirical = mean((x1 - mean(x1)) .* (x2 - mean(x2)));
+
+cov_theory = sigma^2 * min(time(t1), time(t2));
